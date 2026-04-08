@@ -1,1 +1,10 @@
 .venv
+.vscode
+.DS_Store
+.ruff_cache
+.pytest_cache/
+.mypy_cache/
+*.pyc
+*.py[cod]
+__pycache__/
+draft/
