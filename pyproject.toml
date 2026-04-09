@@ -19,6 +19,7 @@ psycopg = { extras = ["binary"], version = "^3.2" }
 python-dotenv = "^1.0.1"
 ipython = "^9.11.0"
 django-extensions = "^4.1"
+django-debug-toolbar = "^6.3.0"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.12.0"
