@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework.relations import SlugRelatedField
 
-from polls.models import Choice, Poll, Question
+from polls.models import Choice, Poll, PollRun, Question
 
 
 class ChoiceSerializer(serializers.ModelSerializer):
@@ -17,7 +17,10 @@ class ChoiceSerializer(serializers.ModelSerializer):
 class ChoiceWriteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Choice
-        fields = ("text", "order")
+        fields = (
+            "text",
+            "order",
+        )
 
 
 class QuestionSerializer(serializers.ModelSerializer):
@@ -70,6 +73,23 @@ class PollDetailSerializer(serializers.ModelSerializer):
         )
 
 
+class PollRunSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PollRun
+        fields = (
+            "id",
+            "poll",
+            "started_at",
+            "completed_at",
+        )
+        read_only_fields = (
+            "id",
+            "poll",
+            "started_at",
+            "completed_at",
+        )
+
+
 class PollCreateSerializer(serializers.ModelSerializer):
     questions = QuestionWriteSerializer(many=True, required=False)
 
@@ -84,17 +104,10 @@ class PollCreateSerializer(serializers.ModelSerializer):
     def create(self, validated_data: dict) -> Poll:
         questions_data = validated_data.pop("questions", [])
         request = self.context.get("request")
-        owner = request.user if request and request.user.is_authenticated else None
-        if owner is None:
-            msg = "Нужен аутентифицированный пользователь (владелец опроса)."
-            raise serializers.ValidationError({"owner": msg})
+        owner = request.user
         poll = Poll.objects.create(owner=owner, **validated_data)
-        for q in questions_data:
-            Question.objects.create(poll=poll, **q)
+        if questions_data:
+            Question.objects.bulk_create(
+                [Question(poll=poll, **q) for q in questions_data],
+            )
         return poll
-
-
-class PollPartialUpdateSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Poll
-        fields = ("title", "is_published")
