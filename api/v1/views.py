@@ -24,7 +24,11 @@ class PollModelViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         respondent_ok = Q(is_published=True) | Q(owner_id=user.id)
-        if self.action in ("retrieve", "start"):
+        if self.action in (
+            "retrieve",
+            "start",
+            "next_question",
+        ):
             return self.queryset.filter(respondent_ok).order_by("-created_at")
         return self.queryset.filter(owner=user).order_by("-created_at")
 
@@ -45,8 +49,33 @@ class PollModelViewSet(viewsets.ModelViewSet):
         poll = self.get_object()
         run, created = PollRun.objects.get_or_create(poll=poll, user=request.user)
         data = PollRunSerializer(run).data
-        st = status.HTTP_201_CREATED if created else status.HTTP_200_OK
-        return Response(data=data, status=st)
+        status_code = status.HTTP_201_CREATED if created else status.HTTP_200_OK
+        return Response(data=data, status=status_code)
+
+    @action(detail=True, methods=["get"], url_path="next-question")
+    def next_question(self, request, pk=None):
+        poll = self.get_object()
+        poll_run = get_object_or_404(PollRun, poll=poll, user=request.user)
+        if poll_run.completed_at is not None:
+            return Response(data={"completed": True, "question": None})
+
+        answered_question_ids = poll_run.answers.values_list(
+            "question_id", flat=True
+        ).distinct()
+        next_question = (
+            poll.questions.exclude(pk__in=answered_question_ids)
+            .order_by("order")
+            .first()
+        )
+        if next_question is None:
+            return Response(data={"completed": True, "question": None})
+
+        return Response(
+            data={
+                "completed": False,
+                "question": QuestionSerializer(next_question).data,
+            },
+        )
 
     @action(detail=True, methods=["post"], url_path="publish")
     def publish(self, request, pk=None):
